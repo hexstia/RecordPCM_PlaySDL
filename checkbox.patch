@@ -1,0 +1,736 @@
+diff --git a/alps/packages/apps/Settings/res/layout/dialog_hardware_info.xml b/alps/packages/apps/Settings/res/layout/dialog_hardware_info.xml
+index f9d52b8..6057992 100644
+--- a/alps/packages/apps/Settings/res/layout/dialog_hardware_info.xml
++++ b/alps/packages/apps/Settings/res/layout/dialog_hardware_info.xml
+@@ -15,17 +15,18 @@
+   limitations under the License.
+   -->
+ 
+-<ScrollView
++<!-- <ScrollView
+     xmlns:android="http://schemas.android.com/apk/res/android"
++    android:fillViewport="true"
+     android:layout_width="match_parent"
+-    android:layout_height="wrap_content">
++    android:layout_height="fill_parent">
+     <LinearLayout
+         android:orientation="vertical"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+-        android:padding="24dp">
++        android:padding="24dp">-->
+ 
+-        <TextView
++       <!-- <TextView
+             android:id="@+id/model_label"
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+@@ -51,7 +52,14 @@
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+             android:paddingBottom="24dp"
+-            android:textAppearance="@android:style/TextAppearance.Material.Body2" />
++            android:textAppearance="@android:style/TextAppearance.Material.Body2" /> -->
++
++    <ListView
++    xmlns:android="http://schemas.android.com/apk/res/android"
++        android:id="@+id/listview"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent">
++        </ListView>
+ 
+-    </LinearLayout>
+-</ScrollView>
+\ No newline at end of file
++  <!--    </LinearLayout> -->
++    
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/DeviceInfoSettings.java b/alps/packages/apps/Settings/src/com/android/settings/DeviceInfoSettings.java
+index 7ca52e2..57c4b3b 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/DeviceInfoSettings.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/DeviceInfoSettings.java
+@@ -42,6 +42,8 @@ import com.android.settings.search.BaseSearchIndexProvider;
+ import com.android.settings.search.Indexable;
+ import com.android.settingslib.core.AbstractPreferenceController;
+ import com.android.settingslib.core.lifecycle.Lifecycle;
++import android.os.SystemProperties;
++import android.util.Log;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
+@@ -70,6 +72,12 @@ public class DeviceInfoSettings extends DashboardFragment implements Indexable {
+         if (buildNumberPreferenceController.onActivityResult(requestCode, resultCode, data)) {
+             return;
+         }
++
++        final DeviceModelPreferenceController deviceModelPreferenceController =
++                getPreferenceController(DeviceModelPreferenceController.class);
++        if (deviceModelPreferenceController.onActivityResult(requestCode, resultCode, data)) {
++            return;
++        }
+         super.onActivityResult(requestCode, resultCode, data);
+     }
+ 
+@@ -100,7 +108,9 @@ public class DeviceInfoSettings extends DashboardFragment implements Indexable {
+         @Override
+         public void setListening(boolean listening) {
+             if (listening) {
+-                mSummaryLoader.setSummary(this, DeviceModelPreferenceController.getDeviceModel());
++                //mSummaryLoader.setSummary(this, DeviceModelPreferenceController.getDeviceModel());
++                Log.d("hws","107 setListening MODEL "+SystemProperties.get("ro.product.model"));
++                mSummaryLoader.setSummary(this, SystemProperties.get("ro.product.model"));
+             }
+         }
+     }
+@@ -118,16 +128,17 @@ public class DeviceInfoSettings extends DashboardFragment implements Indexable {
+             Activity activity, Fragment fragment, Lifecycle lifecycle) {
+         final List<AbstractPreferenceController> controllers = new ArrayList<>();
+         controllers.add(
+-                new BuildNumberPreferenceController(context, activity, fragment, lifecycle));
++                new BuildNumberPreferenceController(context, activity, fragment, lifecycle));//BuildNumber
+         controllers.add(new AdditionalSystemUpdatePreferenceController(context));
+         controllers.add(new ManualPreferenceController(context));
+         controllers.add(new FeedbackPreferenceController(fragment, context));
+-        controllers.add(new KernelVersionPreferenceController(context));
+-        controllers.add(new BasebandVersionPreferenceController(context));
+-        controllers.add(new FirmwareVersionPreferenceController(context, lifecycle));
++        controllers.add(new KernelVersionPreferenceController(context));//KernelVersion
++        controllers.add(new BasebandVersionPreferenceController(context));//Baseband
++        controllers.add(new FirmwareVersionPreferenceController(context, lifecycle));//Device firmware version==android
+         controllers.add(new RegulatoryInfoPreferenceController(context));
+-        controllers.add(new DeviceModelPreferenceController(context, fragment));
+-        controllers.add(new SecurityPatchPreferenceController(context));
++        //controllers.add(new DeviceModelPreferenceController(context, fragment));//DeviceModel
++        controllers.add(new DeviceModelPreferenceController(context, fragment,lifecycle));//DeviceModel
++        controllers.add(new SecurityPatchPreferenceController(context));//SecurityPatch
+         controllers.add(new FccEquipmentIdPreferenceController(context));
+         controllers.add(new SELinuxStatusPreferenceController(context));
+         controllers.add(new SafetyInfoPreferenceController(context));
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
+index a25bb53..1cc7623 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
+@@ -82,7 +82,7 @@ public class BuildNumberPreferenceController extends AbstractPreferenceControlle
+         final Preference preference = screen.findPreference(KEY_BUILD_NUMBER);
+         if (preference != null) {
+             try {
+-                preference.setSummary(BidiFormatter.getInstance().unicodeWrap(Build.DISPLAY));
++                preference.setSummary(BidiFormatter.getInstance().unicodeWrap(Build.DISPLAY));//getString("ro.build.display.id");
+                 preference.setEnabled(true);
+             } catch (Exception e) {
+                 preference.setSummary(R.string.device_info_default);
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/DeviceModelPreferenceController.java b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/DeviceModelPreferenceController.java
+index f1dc415..706f509 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/DeviceModelPreferenceController.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/DeviceModelPreferenceController.java
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ package com.android.settings.deviceinfo;
++import android.app.Activity;
++import android.content.Intent;
+ 
+ import android.app.Fragment;
+ import android.content.Context;
+@@ -21,21 +23,96 @@ import android.os.Build;
+ import android.support.v7.preference.Preference;
+ import android.support.v7.preference.PreferenceScreen;
+ import android.text.TextUtils;
++import android.util.Log;
++import android.os.SystemProperties;
++import android.provider.Settings;
++import android.database.ContentObserver;
++import android.content.ContentResolver;
++import com.android.settingslib.core.lifecycle.LifecycleObserver;
++import com.android.settingslib.core.lifecycle.Lifecycle;
++
++import com.android.settingslib.core.lifecycle.events.OnPause;
++import com.android.settingslib.core.lifecycle.events.OnResume;
++import android.net.Uri;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.Bundle;
++import android.widget.Toast;
+ 
+ import com.android.settings.core.PreferenceControllerMixin;
+ import com.android.settingslib.DeviceInfoUtils;
+ import com.android.settingslib.core.AbstractPreferenceController;
+ 
+ public class DeviceModelPreferenceController extends AbstractPreferenceController implements
+-        PreferenceControllerMixin {
++        PreferenceControllerMixin, LifecycleObserver, OnResume, OnPause{
+ 
+     private static final String KEY_DEVICE_MODEL = "device_model";
+ 
+     private final Fragment mHost;
++    private final Context mContext;
++    private final ContentResolver mContentResolver;
++    private final ModelSettingObserver mSettingObserver;
++    private Preference mPreference;
+ 
+-    public DeviceModelPreferenceController(Context context, Fragment host) {
++    public DeviceModelPreferenceController(Context context, Fragment host,Lifecycle lifecycle) {
+         super(context);
+         mHost = host;
++        mContext = context;
++        mContentResolver = context.getContentResolver();
++        mSettingObserver = new ModelSettingObserver();
++        if (lifecycle != null) {
++            lifecycle.addObserver(this);
++        }
++    }
++
++     @Override
++    public void onResume() {
++     Log.d("hws","onResume  "+mContentResolver);
++        mSettingObserver.register(mContentResolver);
++    }
++
++    @Override
++    public void onPause() {
++    Log.d("hws","onPause  "+mContentResolver);
++        mSettingObserver.unregister(mContentResolver);
++    }
++    class ModelSettingObserver extends ContentObserver {
++        private final Uri PRODUCT_MODEL_URI =
++                Settings.Global.getUriFor(Settings.Global.PRODUCT_MODEL);
++
++        public ModelSettingObserver() {
++            super(new Handler(Looper.getMainLooper()));
++        }
++
++        public void register(ContentResolver cr) {
++         Log.d("hws","register  "+mContentResolver);
++            cr.registerContentObserver(PRODUCT_MODEL_URI, false, this);
++            onChange(true /* selfChange */, PRODUCT_MODEL_URI);
++        }
++
++        public void unregister(ContentResolver cr) {
++        Log.d("hws","unregister  "+mContentResolver);
++            cr.unregisterContentObserver(this);
++        }
++
++        @Override
++        public void onChange(boolean selfChange, Uri uri) {
++            super.onChange(selfChange, uri);
++            if (PRODUCT_MODEL_URI.equals(uri)) {
++                Log.d("hws","onChange uri "+uri);
++                updateModelState(mPreference);
++            }
++        }
++    }
++    public void updateModelState(Preference preference) {
++
++     final String model = Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MODEL);
++     Log.d("hws","updateModelState  "+model+"   preference.getSummary()  "+preference.getSummary());
++        if (!model.equals(preference.getSummary()) ) {
++             preference.setSummary(" manufacturer: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MAUNFACTURER)
++            +" ;device: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_DEVICE)
++            +" ;model: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MODEL));
++        }
+     }
+ 
+     @Override
+@@ -46,9 +123,15 @@ public class DeviceModelPreferenceController extends AbstractPreferenceControlle
+     @Override
+     public void displayPreference(PreferenceScreen screen) {
+         super.displayPreference(screen);
+-        final Preference pref = screen.findPreference(KEY_DEVICE_MODEL);
+-        if (pref != null) {
+-            pref.setSummary(getDeviceModel());
++        mPreference = screen.findPreference(KEY_DEVICE_MODEL);
++        if (mPreference != null) {
++            //mPreference.setSummary(getDeviceModel());
++           // mPreference.setSummary(SystemProperties.get("ro.product.model"));
++           Log.d("hws","displayPreference Global "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MODEL));
++        mPreference.setSummary(" manufacturer: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MAUNFACTURER)
++            +" ; \n device: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_DEVICE)
++            +" ; \n model: "+Settings.Global.getString(mContentResolver, Settings.Global.PRODUCT_MODEL));
++
+         }
+     }
+ 
+@@ -63,11 +146,28 @@ public class DeviceModelPreferenceController extends AbstractPreferenceControlle
+             return false;
+         }
+         final HardwareInfoDialogFragment fragment = HardwareInfoDialogFragment.newInstance();
++        fragment.setTargetFragment(mHost, Activity.RESULT_OK);
+         fragment.show(mHost.getFragmentManager(), HardwareInfoDialogFragment.TAG);
++        
++        return true;
++    }
++
++    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {  
++        if (resultCode == Activity.RESULT_OK && data != null) {//获取从DialogFragmentB中传递的mB2A
++            Bundle bundle = data.getExtras();
++            if (bundle != null) {
++                String manufacturer = bundle.getString("manufacturer");
++                String device = bundle.getString("device");
++                String model = bundle.getString("model");
++                Log.d("hws","159 onActivityResult  manufacturer: "+manufacturer +" ;device: "+device+" ;model: "+model);
++                mPreference.setSummary(" manufacturer: "+manufacturer +" ; \n device: "+device+" ; \n model: "+model);
++            }
++        }
+         return true;
+     }
+ 
+     public static String getDeviceModel() {
++        Log.d("hws","54 Settings Build.MODEL "+Build.MODEL +" DeviceInfoUtils  "+(Build.MODEL + DeviceInfoUtils.getMsvSuffix()));
+         return Build.MODEL + DeviceInfoUtils.getMsvSuffix();
+     }
+ }
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/HardwareInfoDialogFragment.java b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/HardwareInfoDialogFragment.java
+index 60082c7..72e054c 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/HardwareInfoDialogFragment.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/HardwareInfoDialogFragment.java
+@@ -15,6 +15,8 @@
+  */
+ 
+ package com.android.settings.deviceinfo;
++import android.content.DialogInterface;
++import android.app.Activity;
+ 
+ import android.app.AlertDialog;
+ import android.app.Dialog;
+@@ -25,15 +27,37 @@ import android.text.TextUtils;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.widget.TextView;
++import android.util.Log;
++import android.provider.Settings;
++import java.util.ArrayList;
++import java.util.LinkedList;
++import java.util.List;
++import android.widget.ListView;
++import android.content.Intent;
++
++import com.android.settings.deviceinfo.model.ListViewAdapter;
++import com.android.settings.deviceinfo.model.Node;
++import com.android.settings.deviceinfo.model.NodeData;
++import com.android.settings.deviceinfo.model.OnTreeNodeCheckedChangeListener;
+ 
+ import com.android.internal.logging.nano.MetricsProto;
+ import com.android.settings.R;
+ import com.android.settings.core.instrumentation.InstrumentedDialogFragment;
+ 
++
++
+ public class HardwareInfoDialogFragment extends InstrumentedDialogFragment {
+ 
+     public static final String TAG = "HardwareInfo";
+ 
++    private ListView mListView;
++
++    private List<Node> dataList = new ArrayList<>();
++    private ListViewAdapter mAdapter;
++    private String manufacturer;
++    private String device;
++    private String model;
++
+     @Override
+     public int getMetricsCategory() {
+         return MetricsProto.MetricsEvent.DIALOG_SETTINGS_HARDWARE_INFO;
+@@ -48,19 +72,136 @@ public class HardwareInfoDialogFragment extends InstrumentedDialogFragment {
+     public Dialog onCreateDialog(Bundle savedInstanceState) {
+         final AlertDialog.Builder builder = new AlertDialog.Builder(getActivity())
+                 .setTitle(R.string.hardware_info)
+-                .setPositiveButton(android.R.string.ok, null);
++                .setPositiveButton(android.R.string.ok,new DialogInterface.OnClickListener() {
++                    @Override
++                    public void onClick(final DialogInterface dialog, final int which) {
++                        if (getTargetFragment() != null) {
++                            Intent resultIntent = new Intent();
++                            Log.e("hws", "HardwareInfo 85 b2a: " +manufacturer +" device "+device+" model "+model);
++                            resultIntent.putExtra("manufacturer",manufacturer);
++                            resultIntent.putExtra("device",device);
++                            resultIntent.putExtra("model",model);
++                            Settings.Global.putString(getActivity().getContentResolver(), Settings.Global.PRODUCT_MODEL, model);
++                            Settings.Global.putString(getActivity().getContentResolver(), Settings.Global.PRODUCT_DEVICE, device);
++                            Settings.Global.putString(getActivity().getContentResolver(), Settings.Global.PRODUCT_MAUNFACTURER, manufacturer);
++                            getTargetFragment().onActivityResult(getTargetRequestCode(),
++                                 Activity.RESULT_OK, resultIntent);
++                         }
++
++                    }
++                  })
++                  .setNegativeButton(android.R.string.cancel, null);
++
+         final View content = LayoutInflater.from(builder.getContext())
+                 .inflate(R.layout.dialog_hardware_info, null /* parent */);
+         // Model
+-        setText(content, R.id.model_label, R.id.model_value,
+-                DeviceModelPreferenceController.getDeviceModel());
++        /*setText(content, R.id.model_label, R.id.model_value,
++                //DeviceModelPreferenceController.getDeviceModel());
++                
++                SystemProperties.getProp("ro.product.model"));
++        Settings.Global.putString(getActivity().getContentResolver(), Settings.Global.PRODUCT_MODEL, SystemProperties.get("ro.product.model"));
++        Log.d("SystemProperties","Settings.Global "+ Settings.Global.getString(getActivity().getContentResolver(), Settings.Global.PRODUCT_MODEL));
++
+         // Hardware rev
+         setText(content, R.id.hardware_rev_label, R.id.hardware_rev_value,
+-                SystemProperties.get("ro.boot.hardware.revision"));
++                SystemProperties.get("ro.boot.hardware.revision"));*/
++
++        mListView = (ListView) content.findViewById(R.id.listview);
++        initData();
++
++        //第一个参数  ListView
++        //第二个参数  上下文
++        //第三个参数  数据集
++        //第四个参数  默认展开层级数 0为不展开
++        //第五个参数  展开的图标
++        //第六个参数  闭合的图标
++        mAdapter = new ListViewAdapter(mListView, getContext(), dataList,
++                0, R.drawable.zoomout_yzs, R.drawable.zoomin_yzs);
++
++        mListView.setAdapter(mAdapter);
++
++        //获取所有节点
++        final List<Node> allNodes = mAdapter.getAllNodes();
++
++        //选中状态监听
++        mAdapter.setCheckedChangeListener(new OnTreeNodeCheckedChangeListener() {
++            @Override
++            public void onCheckChange(Node node, int position, boolean isChecked) {
++
++                if(isChecked){
++                    for (int i = 0; i < allNodes.size(); i++) {
++                        if (allNodes.get(i).getId().equals(node.getId())) {
++                            allNodes.get(i).setChecked(true);
++                            allNodes.get(i).getParent().setChecked(true);
++                            allNodes.get(i).getParent().getParent().setChecked(true);
++                        } else {
++                             allNodes.get(i).setChecked(false);
++                        }
++                   }
++                }
++
++                manufacturer = node.getParent().getParent().getName();
++                device = node.getParent().getName();
++                model = node.getName();
++                Log.e("hws", "HardwareInfo onCheck manufacturer: "+manufacturer +" ;device: "+device+" ;model: "+model);
++
++
++                mAdapter.notifyDataSetChanged();
++            }
++        });
+ 
+         return builder.setView(content).create();
+     }
+ 
++    /**
++     * 模拟数据，实际开发中对返回的json数据进行封装
++     */
++    private void initData() {
++        //根节点
++        Node<NodeData> node = new Node<>("0", "-1", "SAMSUNG");//manufacturer
++        dataList.add(node);
++        dataList.add(new Node<>("1", "-1", "HUAWEI"));
++        dataList.add(new Node<>("2", "-1", "MI"));
++
++        //根节点1的二级节点
++        dataList.add(new Node<>("3", "0", "D608"));//ro.product.device
++        dataList.add(new Node<>("4", "0", "E258"));
++        dataList.add(new Node<>("5", "0", "D64545"));
++
++        //根节点2的二级节点
++        dataList.add(new Node<>("6", "1", "HONOR"));
++        dataList.add(new Node<>("7", "1", "HONOR2"));
++        dataList.add(new Node<>("8", "1", "HONOR3"));
++
++        //根节点3的二级节点
++        dataList.add(new Node<>("9", "2", "2S"));
++        dataList.add(new Node<>("10", "2", "3S"));
++        dataList.add(new Node<>("11", "2", "5S"));
++
++        //三级节点
++        dataList.add(new Node<>("12", "3", "SGH-I688"));//model name
++        dataList.add(new Node<>("13", "3", "SGH-I728"));
++        dataList.add(new Node<>("14", "3", "I8510"));
++
++        dataList.add(new Node<>("15", "4", "SCH-S159"));
++        dataList.add(new Node<>("16", "4", "SCH-S169"));
++        dataList.add(new Node<>("17", "4", "SCH-S199"));
++
++        dataList.add(new Node<>("18", "5", "S3500"));
++        dataList.add(new Node<>("19", "5", "B5712C"));
++        dataList.add(new Node<>("20", "5", "707SC"));
++
++        dataList.add(new Node<>("21", "6", "5X"));
++        dataList.add(new Node<>("22", "6", "6x"));
++
++
++        //四级节点
++        //dataList.add(new Node<>("21", "12", "四级节点"));
++
++        //...
++        //可以有无线多层级
++    }
++
+     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+     void setText(View content, int labelViewId, int valueViewId, String value) {
+         if (content == null) {
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/SerialNumberPreferenceController.java b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/SerialNumberPreferenceController.java
+index b69844d..3cb3d91 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/SerialNumberPreferenceController.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/SerialNumberPreferenceController.java
+@@ -15,12 +15,20 @@
+  */
+ 
+ package com.android.settings.deviceinfo;
++import android.os.SystemProperties;
++import android.app.Fragment;
+ 
+ import android.content.Context;
+ import android.os.Build;
+ import android.support.v7.preference.Preference;
+ import android.support.v7.preference.PreferenceScreen;
+ import android.text.TextUtils;
++import android.app.AlertDialog;
++import android.app.Dialog;
++import android.util.Log;
++
++import com.android.settings.R;
++
+ 
+ import com.android.internal.annotations.VisibleForTesting;
+ import com.android.settings.core.PreferenceControllerMixin;
+@@ -32,9 +40,12 @@ public class SerialNumberPreferenceController extends AbstractPreferenceControll
+     private static final String KEY_SERIAL_NUMBER = "serial_number";
+ 
+     private final String mSerialNumber;
++    private Context mContext;
+ 
+     public SerialNumberPreferenceController(Context context) {
+         this(context, Build.getSerial());
++        //this(context,  SystemProperties.get("ro.serialno"));
++        mContext = context;
+     }
+ 
+     @VisibleForTesting
+@@ -58,6 +69,20 @@ public class SerialNumberPreferenceController extends AbstractPreferenceControll
+     }
+ 
+     @Override
++    public boolean handlePreferenceTreeClick(Preference preference) {
++        if (!TextUtils.equals(preference.getKey(), KEY_SERIAL_NUMBER)) {
++            return false;
++        }
++        /*Log.d("SystemProperties", "75 KEY_SERIAL_NUMBER==");
++        Dialog mAdbDialog = new AlertDialog.Builder(mContext)
++                .setTitle(R.string.status_serial_number)
++                .setMessage(SystemProperties.getProp("ro.serialno"))
++                .setPositiveButton(android.R.string.ok, null)
++                .show();*/
++        return true;
++    }
++
++    @Override
+     public String getPreferenceKey() {
+         return KEY_SERIAL_NUMBER;
+     }
+diff --git a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/Status.java b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/Status.java
+index 624103a..4435bab 100644
+--- a/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/Status.java
++++ b/alps/packages/apps/Settings/src/com/android/settings/deviceinfo/Status.java
+@@ -15,6 +15,11 @@
+  */
+ 
+ package com.android.settings.deviceinfo;
++import android.support.v7.preference.DropDownPreference;
++import android.support.v7.preference.Preference;
++import android.support.v7.preference.Preference.OnPreferenceChangeListener;
++import android.support.v7.preference.Preference.OnPreferenceClickListener;
++import android.support.v7.preference.PreferenceScreen;
+ 
+ import android.bluetooth.BluetoothAdapter;
+ import android.content.BroadcastReceiver;
+@@ -35,6 +40,8 @@ import android.provider.SearchIndexableResource;
+ import android.support.v7.preference.Preference;
+ import android.support.v7.preference.PreferenceScreen;
+ import android.text.TextUtils;
++import android.util.Log;
++import java.io.File;
+ 
+ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+ import com.android.internal.util.ArrayUtils;
+@@ -50,6 +57,37 @@ import java.util.List;
+ 
+ import static android.content.Context.CONNECTIVITY_SERVICE;
+ import static android.content.Context.WIFI_SERVICE;
++import android.ruisasi.ScrcpyManager;
++import com.android.settingslib.core.AbstractPreferenceController;
++import android.app.Activity;
++import android.app.Fragment;
++import com.android.settingslib.core.lifecycle.Lifecycle;
++import java.util.Collection;
++import java.util.Map;
++import android.util.ArrayMap;
++import android.app.AlertDialog;
++import android.app.Dialog;
++import android.content.DialogInterface;
++import android.net.LinkAddress;
++import android.net.wifi.WifiConfiguration;
++import java.io.IOException;
++import java.lang.reflect.Constructor;
++import java.lang.reflect.Field;
++import java.lang.reflect.InvocationTargetException;
++import java.net.InetAddress;
++import android.net.LinkProperties;
++import android.net.LinkAddress;
++
++import java.lang.reflect.Method;
++import java.util.Locale;
++import java.util.HashMap;
++import android.content.ContentResolver;
++import android.provider.Settings;
++
++import android.provider.Settings.System;
++
++import java.util.ArrayList;
++
+ 
+ public class Status extends SettingsPreferenceFragment implements Indexable {
+ 
+@@ -81,7 +119,7 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+ 
+     private String mUnavailable;
+ 
+-    private SerialNumberPreferenceController mSerialNumberPreferenceController;
++    private static SerialNumberPreferenceController mSerialNumberPreferenceController;
+ 
+     private Preference mUptime;
+     private Preference mBatteryStatus;
+@@ -91,6 +129,8 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+     private Preference mWifiMacAddress;
+     private Preference mWimaxMacAddress;
+     private Handler mHandler;
++    private final Map<Class, AbstractPreferenceController> mPreferenceControllers =
++            new ArrayMap<>();
+ 
+     private static class MyHandler extends Handler {
+         private WeakReference<Status> mStatus;
+@@ -150,6 +190,24 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+         return  mCM.getNetworkInfo(ConnectivityManager.TYPE_WIMAX) != null;
+     }
+ 
++    protected void addPreferenceController(AbstractPreferenceController controller) {
++        mPreferenceControllers.put(controller.getClass(), controller);
++    }
++
++    protected List<AbstractPreferenceController> getPreferenceControllers(Context context) {
++        return buildPreferenceControllers(context, getActivity(), this ,
++                getLifecycle());
++    }
++
++    private static List<AbstractPreferenceController> buildPreferenceControllers(Context context,
++            Activity activity, Fragment fragment, Lifecycle lifecycle) {
++        final List<AbstractPreferenceController> controllers = new ArrayList<>();
++        controllers.add(mSerialNumberPreferenceController);
++        return controllers;
++    }
++
++
++
+     @Override
+     public void onCreate(Bundle icicle) {
+         super.onCreate(icicle);
+@@ -161,6 +219,17 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+         mSerialNumberPreferenceController = new SerialNumberPreferenceController(getActivity());
+ 
+         addPreferencesFromResource(R.xml.device_info_status);
++
++        List<AbstractPreferenceController> controllers = getPreferenceControllers(getActivity());
++        if (controllers == null) {
++            controllers = new ArrayList<>();
++        }
++
++        controllers.add(mSerialNumberPreferenceController);
++        for (AbstractPreferenceController controller : controllers) {
++            addPreferenceController(controller);
++        }
++        
+         mBatteryLevel = findPreference(KEY_BATTERY_LEVEL);
+         mBatteryStatus = findPreference(KEY_BATTERY_STATUS);
+         mBtAddress = findPreference(KEY_BT_ADDRESS);
+@@ -168,6 +237,35 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+         mWimaxMacAddress = findPreference(KEY_WIMAX_MAC_ADDRESS);
+         mIpAddress = findPreference(KEY_IP_ADDRESS);
+ 
++        mIpAddress.setOnPreferenceClickListener(new OnPreferenceClickListener(){
++            public boolean onPreferenceClick(Preference preference){
++                
++                /*try{
++                    Runtime mt =Runtime.getRuntime();
++                    File  myfile =new File("/system/bin","ifconfig");
++                    mt.exec(myfile.getAbsolutePath() +" eth0 10.0.68."+IP++);
++                    } catch(Exception e){}
++                
++                 Dialog mAdbDialog = new AlertDialog.Builder(getActivity())
++                .setTitle("")
++                .setMessage("IP")
++                .setPositiveButton(android.R.string.ok, 
++                    new DialogInterface.OnClickListener() {
++                        @Override
++                        public void onClick(final DialogInterface dialog, final int which) {
++                            final ContentResolver mContentResolver = getContentResolver();
++                           // Settings.System.putInt( mContentResolver, Settings.System.WIFI_USE_STATIC_IP, 1);
++                           // Settings.System.putString( mContentResolver, Settings.System.WIFI_STATIC_IP, "10.0.68.266");
++                           
++                             Log.d("hws", " WIFI_STATIC_IP=="+(Settings.System.getString(mContentResolver, Settings.System.WIFI_STATIC_IP)));
++                    }})
++                .show();*/
++                ;
++            return true;
++            }
++
++            });
++
+         mRes = getResources();
+         mUnavailable = mRes.getString(R.string.status_unavailable);
+ 
+@@ -188,6 +286,10 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+         for (String intent: CONNECTIVITY_INTENTS) {
+              mConnectivityIntentFilter.addAction(intent);
+         }
++        //huwenshan add
++        //mScrcpyManager = (ScrcpyManager) getSystemService(Context.SCRCPY_SERVICE);
++         //Log.d("hws", " mScrcpyManager=="+mScrcpyManager.toString());
++        // Log.d("hws", "hws mScrcpyManager.test()=="+mScrcpyManager.test());
+ 
+         updateConnectivity();
+ 
+@@ -200,9 +302,23 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+                 || Utils.isWifiOnly(getContext())) {
+             removePreferenceFromScreen(KEY_SIM_STATUS);
+             removePreferenceFromScreen(KEY_IMEI_INFO);
++            
+         }
+     }
+ 
++        @Override
++        public boolean onPreferenceTreeClick(Preference preference) {
++            Collection<AbstractPreferenceController> controllers = mPreferenceControllers.values();
++
++            // Give all controllers a chance to handle click.
++            for (AbstractPreferenceController controller : controllers) {
++                if (controller.handlePreferenceTreeClick(preference)) {
++                    return true;
++                }
++            }
++            return super.onPreferenceTreeClick(preference);
++        }
++
+     @Override
+     public int getMetricsCategory() {
+         return MetricsEvent.DEVICEINFO_STATUS;
+@@ -253,7 +369,9 @@ public class Status extends SettingsPreferenceFragment implements Indexable {
+     }
+ 
+     private void setIpAddressStatus() {
++   
+         String ipAddress = Utils.getDefaultIpAddresses(this.mCM);
++        //String ipAddress = Settings.System.getString(getContentResolver(), Settings.System.WIFI_STATIC_IP);
+         if (ipAddress != null) {
+             mIpAddress.setSummary(ipAddress);
+         } else {
