@@ -67,10 +67,10 @@ public class StartService extends Service {
 	private DatagramSocket socket;
 	private InetAddress host;
 	private ReadThread rt;
-	private int index;
-	private int jndex;
+	private long index;
+	private long jndex;
 	private int length;
-	private static Vector<byte[]> list = new Vector<byte[]>(10005);
+	private static Vector<byte[]> list = new Vector<byte[]>(2006);
 	private SendThread st;
 	private boolean stopSendThread = true;
 
@@ -191,17 +191,17 @@ public class StartService extends Service {
 							while(jndex>=index){
 							}
 
-						byte[] bs = list.get(jndex);
+						byte[] bs = list.get((int)(jndex+2000)%2000);
 						jndex++;
 
-						Log.i("TASK","index : "+index+".."+"jndex : "+jndex);
-						Log.i("TASK","\n\n"+new String(bs));
+						//	Log.i("TASK","index : "+index+".."+"jndex : "+jndex);
+						//Log.i("TASK","\n\n"+new String(bs));
 						DatagramPacket request = new DatagramPacket(bs, length, host, 27188);
 						socket.send(request);
 					} catch (Exception e) {
 						// isRecording = false;
 						// stopSendThread = false;
-						Log.i("TASK","Exception::::");
+						//Log.i("TASK","Exception::::");
 					}
 				}
 
@@ -218,7 +218,7 @@ public class StartService extends Service {
 		// 读取放入盒子中
 
 		length = audioRecord.read(buffer, 0, bufferSizeInBytes);
-		list.add(index, buffer);
+		list.add((int)(index+2000)%2000, buffer);
 		index++;
 //		buffer.clear();
 
