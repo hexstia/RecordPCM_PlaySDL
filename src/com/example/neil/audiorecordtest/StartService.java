@@ -70,7 +70,7 @@ public class StartService extends Service {
 	private int index;
 	private int jndex;
 	private int length;
-	private static Vector<byte[]> list = new Vector<byte[]>();
+	private static Vector<byte[]> list = new Vector<byte[]>(10005);
 	private SendThread st;
 	private boolean stopSendThread = true;
 
@@ -188,14 +188,20 @@ public class StartService extends Service {
 			while (stopSendThread) {
 				if (AudioRecord.ERROR_INVALID_OPERATION != length) {
 					try {
-						Log.i("TAG", "COMING ...." + fd + " " + bufferSizeInBytes + " " + length);
+							while(jndex>=index){
+							}
+
 						byte[] bs = list.get(jndex);
 						jndex++;
-						// IO.writeFully(fd, buffer, 0, bufferSizeInBytes);
+
+						Log.i("TASK","index : "+index+".."+"jndex : "+jndex);
+						Log.i("TASK","\n\n"+new String(bs));
 						DatagramPacket request = new DatagramPacket(bs, length, host, 27188);
 						socket.send(request);
 					} catch (Exception e) {
-//						isRecording = false;
+						// isRecording = false;
+						// stopSendThread = false;
+						Log.i("TASK","Exception::::");
 					}
 				}
 
@@ -255,7 +261,7 @@ public class StartService extends Service {
 			android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
 			try {
 				socket = new DatagramSocket();
-				host = InetAddress.getByName("192.168.255.105");
+				host = InetAddress.getByName("192.168.255.104");
 
 			} catch (UnknownHostException e1) {
 				// TODO Auto-generated catch block
@@ -294,13 +300,20 @@ public class StartService extends Service {
 			stopSendThread = false;
 		} catch (InterruptedException e) {
 		}
+		index = 0;
+		jndex = 0;
 		rt = new ReadThread();
 		rt.start();
 		Log.i("TTTT", "restart  ReadThread");
 		stopSendThread = true;
 		st = new SendThread();
 		st.start();
+		try{
+		Thread.sleep(5000);
+		}catch(Exception e){
+
 		threadLoop();
+		}
 	}
 
 	@Override

@@ -138,16 +138,16 @@ int main(int argc, char* argv[])
     int data_count=0;
     pthread_t thread;
     pthread_create(&thread,NULL,run,NULL);
-    // SDL_Delay(1); 
+     SDL_Delay(1); 
 
     //Play
     char* tmp = (char*)malloc(pcm_buffer_size);
     SDL_PauseAudio(0);
         while(1){
 
-         // if(!flag || j>i){
-         //     continue;
-         // }
+         if(j>=i){
+             continue;
+         }
        
        printf("Now Playing %10d Bytes data.\n",data_count);
        data_count+=(pcm_buffer_size);
